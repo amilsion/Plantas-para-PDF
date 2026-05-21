@@ -1,0 +1,18 @@
+{
+  "name": "Plantas",
+  "short_name": "Plantas",
+  "description": "Editor de PDF para plantas com dados do cliente e geracao de PDF consolidado.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3f7f6",
+  "theme_color": "#0b5f59",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

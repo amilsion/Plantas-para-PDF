@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title>Plantas</title>
+  <desc>Icone com folha de planta e pagina de PDF</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b5f59" />
+      <stop offset="100%" stop-color="#13766f" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bg)" />
+  <path d="M18 14h20l8 8v28H18z" fill="#f4fbf8" opacity="0.96" />
+  <path d="M38 14v10h10" fill="#d8efe8" />
+  <path d="M25 39c0-9 8-15 17-16-1 11-7 18-15 19-2 0-2-1-2-3z" fill="#1f8f6a" />
+  <path d="M28 41c3-5 8-10 13-13" fill="none" stroke="#eaf8f2" stroke-width="2.4" stroke-linecap="round" />
+  <path d="M24 49h16" fill="none" stroke="#0b5f59" stroke-width="3" stroke-linecap="round" opacity="0.65" />
+</svg>

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Adicione aqui a URL publica do sitemap quando o site estiver hospedado.
+# Sitemap: https://seu-dominio.com/sitemap.xml
