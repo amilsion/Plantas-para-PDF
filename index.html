@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Plantas - PDF com dados do cliente</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>Plantas</h1>
+          <p>Adicione dados do cliente em cada pagina das plantas e gere um PDF consolidado.</p>
+        </div>
+        <button id="generateBtn" class="primary" type="button" disabled>Gerar PDF final</button>
+      </header>
+
+      <section class="workspace">
+        <aside class="panel">
+          <label class="upload">
+            <input id="pdfInput" type="file" accept="application/pdf" multiple>
+            <span>Selecionar PDFs</span>
+          </label>
+
+          <div id="fileList" class="file-list" aria-label="Paginas carregadas"></div>
+        </aside>
+
+        <section class="editor" aria-label="Editor da planta">
+          <div id="emptyState" class="empty">
+            <strong>Nenhuma planta carregada</strong>
+            <span>Selecione um ou mais PDFs para carregar cada pagina separadamente.</span>
+          </div>
+
+          <div id="activeEditor" class="active-editor hidden">
+            <div class="form-panel">
+              <div class="form-toolbar">
+                <label>
+                  Fonte selecionada
+                  <input id="fontSize" type="number" min="4" max="60" value="14">
+                </label>
+                <label class="toggle-field">
+                  Novas informacoes
+                  <span class="toggle-input">
+                    <input id="showStampToggle" type="checkbox" checked>
+                    <span>Exibir</span>
+                  </span>
+                </label>
+                <div class="toolbar-actions" role="toolbar" aria-label="Ferramentas da pagina">
+                  <button id="rotatePreviewBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Girar previa" title="Girar PDF">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="10" width="10" viewBox="0 0 512 512"><path fill="rgb(11, 95, 89)" d="M256 64c-56.8 0-107.9 24.7-143.1 64l47.1 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 192c-17.7 0-32-14.3-32-32L0 32C0 14.3 14.3 0 32 0S64 14.3 64 32l0 54.7C110.9 33.6 179.5 0 256 0 397.4 0 512 114.6 512 256S397.4 512 256 512c-87 0-163.9-43.4-210.1-109.7-10.1-14.5-6.6-34.4 7.9-44.6s34.4-6.6 44.6 7.9c34.8 49.8 92.4 82.3 157.6 82.3 106 0 192-86 192-192S362 64 256 64z"/></svg>
+                  </button>
+                  <span class="toolbar-divider" aria-hidden="true"></span>
+                  <button id="addInfoBoxBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Adicionar caixa de texto" title="Adicionar caixa de texto">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                  </button>
+                  <button id="copyInfoBoxesBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Copiar caixa(s)" title="Copiar caixa(s)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z" /><path d="M5 15H4V5h10v1" /></svg>
+                  </button>
+                  <button id="pasteInfoBoxesBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Colar caixa(s)" title="Colar caixa(s)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6v3H9z" /><path d="M7 7h10v13H7z" /></svg>
+                  </button>
+                  <span class="toolbar-divider" aria-hidden="true"></span>
+                  <button id="alignLeftBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Alinhar a esquerda" title="Alinhar a esquerda">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 11h10M5 15h14M5 19h10" /></svg>
+                  </button>
+                  <button id="alignCenterBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Centralizar" title="Centralizar">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M7 11h10M5 15h14M7 19h10" /></svg>
+                  </button>
+                  <button id="alignRightBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Alinhar a direita" title="Alinhar a direita">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 11h10M5 15h14M9 19h10" /></svg>
+                  </button>
+                  <button id="boldBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Negrito" title="Negrito">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h6a3 3 0 0 1 0 6H8zM8 11h7a4 4 0 0 1 0 8H8z" /></svg>
+                  </button>
+                  <button id="italicBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Italico" title="Italico">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h-4M10 19h4M13 5l-2 14" /></svg>
+                  </button>
+                  <span class="toolbar-divider" aria-hidden="true"></span>
+                  <label for="imageInput" class="icon-button toolbar-icon-button toolbar-upload-button" aria-label="Enviar imagem" title="Enviar imagem">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="10" width="8.75" viewBox="0 0 448 512"><path fill="rgb(11, 95, 89)" d="M256 109.3L256 320c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-210.7-41.4 41.4c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l96-96c12.5-12.5 32.8-12.5 45.3 0l96 96c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L256 109.3zM224 400c44.2 0 80-35.8 80-80l80 0c35.3 0 64 28.7 64 64l0 32c0 35.3-28.7 64-64 64L64 480c-35.3 0-64-28.7-64-64l0-32c0-35.3 28.7-64 64-64l80 0c0 44.2 35.8 80 80 80zm144 24a24 24 0 1 0 0-48 24 24 0 1 0 0 48z"/></svg>
+                  </label>
+                  <input id="imageInput" class="toolbar-upload-input" type="file" accept="image/png,image/jpeg">
+                  <button id="rotateImageBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Girar imagem" title="Girar imagem">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="10" width="10" viewBox="0 0 512 512"><path fill="rgb(11, 95, 89)" d="M65.9 228.5c13.3-93 93.4-164.5 190.1-164.5 53 0 101 21.5 135.8 56.2 .2 .2 .4 .4 .6 .6l7.6 7.2-47.9 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l128 0c17.7 0 32-14.3 32-32l0-128c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 53.4-11.3-10.7C390.5 28.6 326.5 0 256 0 127 0 20.3 95.4 2.6 219.5 .1 237 12.2 253.2 29.7 255.7s33.7-9.7 36.2-27.1zm443.5 64c2.5-17.5-9.7-33.7-27.1-36.2s-33.7 9.7-36.2 27.1c-13.3 93-93.4 164.5-190.1 164.5-53 0-101-21.5-135.8-56.2-.2-.2-.4-.4-.6-.6l-7.6-7.2 47.9 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L32 320c-8.5 0-16.7 3.4-22.7 9.5S-.1 343.7 0 352.3l1 127c.1 17.7 14.6 31.9 32.3 31.7S65.2 496.4 65 478.7l-.4-51.5 10.7 10.1c46.3 46.1 110.2 74.7 180.7 74.7 129 0 235.7-95.4 253.4-219.5z"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="panel-header panel-header-actions">
+                <span>Use Ctrl/Cmd + clique para selecionar varias caixas e colar em outra pagina na mesma posicao.</span>
+              </div>
+              <div id="pdfTextEmpty" class="hidden"></div>
+              <div id="pdfTextList" class="hidden" aria-hidden="true"></div>
+            </div>
+
+            <div class="preview-shell">
+              <div id="previewStage" class="preview-stage">
+                <canvas id="pdfCanvas"></canvas>
+                <div id="pdfTextOverlayLayer" class="pdf-text-overlay-layer" aria-hidden="true"></div>
+                  <div id="stampLayer" class="stamp-layer" aria-label="Novas informacoes"></div>
+                <div id="imageBox" class="image-box hidden" tabindex="0">
+                  <img id="imageStamp" class="image-stamp" alt="">
+                  <span class="resize-handle resize-handle-right" data-resize="right"></span>
+                  <span class="resize-handle resize-handle-bottom" data-resize="bottom"></span>
+                  <span class="resize-handle resize-handle-corner" data-resize="corner"></span>
+                  <span class="rotate-handle" data-rotate="image"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js?v=19"></script>
+  </body>
+</html>
