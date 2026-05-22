@@ -25,3 +25,7 @@ MVP simples para inserir nome completo e endereco em plantas baixas em PDF e ger
 - PDFs em A3, A4 ou outros formatos sao exibidos e gerados em paisagem quando a pagina estiver em retrato.
 - A pagina usa `pdf-lib` e `pdf.js` via CDN.
 - Para usar sem internet, baixe essas bibliotecas e ajuste os scripts no `index.html`.
+
+## Site publicado
+
+Use a versao online em https://plantaspdf.netlify.app/.

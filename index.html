@@ -46,7 +46,7 @@
     <main class="app">
       <header class="topbar">
         <div>
-          <h1>Plantas</h1>
+          <h1>Plantas baixa ou outros PDFs</h1>
           <p>Adicione dados do cliente em cada pagina das plantas e gere um PDF consolidado.</p>
         </div>
         <button id="generateBtn" class="primary" type="button" disabled>Gerar PDF final</button>
@@ -64,7 +64,7 @@
 
         <section class="editor" aria-label="Editor da planta">
           <div id="emptyState" class="empty">
-            <strong>Nenhuma planta carregada</strong>
+            <strong>Nenhum PDF carregado</strong>
             <span>Selecione um ou mais PDFs para carregar cada pagina separadamente.</span>
           </div>
 
@@ -79,13 +79,24 @@
                   Novas informacoes
                   <span class="toggle-input">
                     <input id="showStampToggle" type="checkbox" checked>
-                    <span>Exibir</span>
+                    <span class="toggle-switch" aria-hidden="true">
+                      <span class="toggle-knob"></span>
+                    </span>
+                    <span class="toggle-text">Exibir</span>
                   </span>
                 </label>
                 <div class="toolbar-actions" role="toolbar" aria-label="Ferramentas da pagina">
                   <button id="rotatePreviewBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Girar previa" title="Girar PDF">
                     <svg xmlns="http://www.w3.org/2000/svg" height="10" width="10" viewBox="0 0 512 512"><path fill="rgb(11, 95, 89)" d="M256 64c-56.8 0-107.9 24.7-143.1 64l47.1 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 192c-17.7 0-32-14.3-32-32L0 32C0 14.3 14.3 0 32 0S64 14.3 64 32l0 54.7C110.9 33.6 179.5 0 256 0 397.4 0 512 114.6 512 256S397.4 512 256 512c-87 0-163.9-43.4-210.1-109.7-10.1-14.5-6.6-34.4 7.9-44.6s34.4-6.6 44.6 7.9c34.8 49.8 92.4 82.3 157.6 82.3 106 0 192-86 192-192S362 64 256 64z"/></svg>
                   </button>
+                  <button id="zoomOutBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Diminuir zoom" title="Diminuir zoom">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg>
+                  </button>
+                  <span id="zoomValue" class="toolbar-zoom-value" aria-live="polite">100%</span>
+                  <button id="zoomInBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Aumentar zoom" title="Aumentar zoom">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                  </button>
+                  <button id="zoomResetBtn" class="secondary toolbar-reset-button" type="button">Ajustar</button>
                   <span class="toolbar-divider" aria-hidden="true"></span>
                   <button id="addInfoBoxBtn" class="icon-button toolbar-icon-button" type="button" aria-label="Adicionar caixa de texto" title="Adicionar caixa de texto">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
@@ -130,16 +141,18 @@
             </div>
 
             <div class="preview-shell">
-              <div id="previewStage" class="preview-stage">
-                <canvas id="pdfCanvas"></canvas>
-                <div id="pdfTextOverlayLayer" class="pdf-text-overlay-layer" aria-hidden="true"></div>
-                  <div id="stampLayer" class="stamp-layer" aria-label="Novas informacoes"></div>
-                <div id="imageBox" class="image-box hidden" tabindex="0">
-                  <img id="imageStamp" class="image-stamp" alt="">
-                  <span class="resize-handle resize-handle-right" data-resize="right"></span>
-                  <span class="resize-handle resize-handle-bottom" data-resize="bottom"></span>
-                  <span class="resize-handle resize-handle-corner" data-resize="corner"></span>
-                  <span class="rotate-handle" data-rotate="image"></span>
+              <div id="previewFrame" class="preview-frame">
+                <div id="previewStage" class="preview-stage">
+                  <canvas id="pdfCanvas"></canvas>
+                  <div id="pdfTextOverlayLayer" class="pdf-text-overlay-layer" aria-hidden="true"></div>
+                    <div id="stampLayer" class="stamp-layer" aria-label="Novas informacoes"></div>
+                  <div id="imageBox" class="image-box hidden" tabindex="0">
+                    <img id="imageStamp" class="image-stamp" alt="">
+                    <span class="resize-handle resize-handle-right" data-resize="right"></span>
+                    <span class="resize-handle resize-handle-bottom" data-resize="bottom"></span>
+                    <span class="resize-handle resize-handle-corner" data-resize="corner"></span>
+                    <span class="rotate-handle" data-rotate="image"></span>
+                  </div>
                 </div>
               </div>
             </div>

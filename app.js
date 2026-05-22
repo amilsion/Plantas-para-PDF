@@ -7,6 +7,10 @@ const fontSizeInput = document.querySelector("#fontSize");
 const boldBtn = document.querySelector("#boldBtn");
 const italicBtn = document.querySelector("#italicBtn");
 const rotatePreviewBtn = document.querySelector("#rotatePreviewBtn");
+const zoomOutBtn = document.querySelector("#zoomOutBtn");
+const zoomInBtn = document.querySelector("#zoomInBtn");
+const zoomResetBtn = document.querySelector("#zoomResetBtn");
+const zoomValue = document.querySelector("#zoomValue");
 const imageInput = document.querySelector("#imageInput");
 const rotateImageBtn = document.querySelector("#rotateImageBtn");
 const showStampToggle = document.querySelector("#showStampToggle");
@@ -18,6 +22,7 @@ const alignCenterBtn = document.querySelector("#alignCenterBtn");
 const alignRightBtn = document.querySelector("#alignRightBtn");
 const pdfTextList = document.querySelector("#pdfTextList");
 const pdfTextEmpty = document.querySelector("#pdfTextEmpty");
+const previewFrame = document.querySelector("#previewFrame");
 const previewStage = document.querySelector("#previewStage");
 const pdfCanvas = document.querySelector("#pdfCanvas");
 const pdfTextOverlayLayer = document.querySelector("#pdfTextOverlayLayer");
@@ -35,6 +40,7 @@ const state = {
   activeId: null,
   renderTask: null,
   previewScale: 1,
+  previewZoom: 1,
   imageAsset: null,
   activePdfTextBlockId: null,
   activeInfoBoxId: null,
@@ -69,6 +75,13 @@ rotatePreviewBtn.addEventListener("click", async () => {
   item.previewRotation = normalizeDegrees(item.previewRotation + 90);
   await showItem(item.id);
 });
+zoomOutBtn.addEventListener("click", () => updatePreviewZoom(-0.25));
+zoomInBtn.addEventListener("click", () => updatePreviewZoom(0.25));
+zoomResetBtn.addEventListener("click", () => {
+  state.previewZoom = 1;
+  fitPreviewToShell();
+  syncPreviewZoomControls();
+});
 imageInput.addEventListener("change", handleImageFile);
 rotateImageBtn.addEventListener("click", () => {
   const item = getActiveItem();
@@ -96,6 +109,8 @@ window.addEventListener("resize", () => {
   positionImageFromRatios();
   renderPdfTextOverlays();
 });
+
+syncPreviewZoomControls();
 
 function createId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
@@ -327,6 +342,8 @@ function clearEditorState() {
   pdfCanvas.height = 0;
   pdfCanvas.style.width = "0px";
   pdfCanvas.style.height = "0px";
+  previewFrame.style.width = "0px";
+  previewFrame.style.height = "0px";
   previewStage.style.width = "0px";
   previewStage.style.height = "0px";
   pdfTextOverlayLayer.innerHTML = "";
@@ -401,15 +418,40 @@ async function renderPreview(item) {
 }
 
 function fitPreviewToShell() {
-  const shell = previewStage.parentElement;
-  previewStage.style.transform = "scale(1)";
+  const shell = previewFrame.parentElement;
+  const stageWidth = Math.max(1, pdfCanvas.width || previewStage.offsetWidth);
+  const stageHeight = Math.max(1, pdfCanvas.height || previewStage.offsetHeight);
   const availableWidth = Math.max(1, shell.clientWidth - 36);
   const availableHeight = Math.max(1, shell.clientHeight - 36);
-  const scale = Math.min(1, availableWidth / previewStage.offsetWidth, availableHeight / previewStage.offsetHeight);
+  const baseScale = Math.min(1, availableWidth / stageWidth, availableHeight / stageHeight);
+  const scale = clamp(baseScale * state.previewZoom, 0.2, 4);
+  const displayWidth = Math.max(1, Math.ceil(stageWidth * scale));
+  const displayHeight = Math.max(1, Math.ceil(stageHeight * scale));
 
   state.previewScale = scale;
+  previewFrame.style.width = `${displayWidth}px`;
+  previewFrame.style.height = `${displayHeight}px`;
+  previewStage.style.width = `${stageWidth}px`;
+  previewStage.style.height = `${stageHeight}px`;
   previewStage.style.transform = `scale(${scale})`;
-  shell.style.minHeight = `${Math.ceil(previewStage.offsetHeight * scale) + 36}px`;
+  pdfCanvas.style.width = `${stageWidth}px`;
+  pdfCanvas.style.height = `${stageHeight}px`;
+  shell.style.minHeight = `${displayHeight + 36}px`;
+  syncPreviewZoomControls();
+}
+
+function updatePreviewZoom(delta) {
+  state.previewZoom = clamp(Number((state.previewZoom + delta).toFixed(2)), 0.5, 4);
+  fitPreviewToShell();
+}
+
+function syncPreviewZoomControls() {
+  if (!zoomValue) return;
+
+  zoomValue.textContent = `${Math.round(state.previewScale * 100)}%`;
+  zoomOutBtn.disabled = state.previewZoom <= 0.5;
+  zoomInBtn.disabled = state.previewZoom >= 4;
+  zoomResetBtn.disabled = Math.abs(state.previewZoom - 1) < 0.01;
 }
 
 function getLandscapeViewport(page, previewRotation, autoPreviewRotation, scale) {
@@ -564,7 +606,13 @@ async function extractPdfTextBlocks(page, item, viewport) {
     const height = Math.max(fontSize * 1.25, 12);
     const lastBlock = textBlocks[textBlocks.length - 1];
 
-    if (lastBlock && Math.abs(lastBlock.top - top) < tolerance && left <= lastBlock.left + lastBlock.width + (fontSize * 1.5)) {
+    const canMergeWithLastBlock = lastBlock
+      && Math.abs(lastBlock.top - top) < tolerance
+      && left <= lastBlock.left + lastBlock.width + (fontSize * 1.5)
+      && Boolean(lastBlock.isBold) === Boolean(styleInfo.isBold)
+      && Boolean(lastBlock.isItalic) === Boolean(styleInfo.isItalic);
+
+    if (canMergeWithLastBlock) {
       const gap = left - (lastBlock.left + lastBlock.width);
       if (gap > fontSize * 0.35 && !lastBlock.originalText.endsWith(" ")) {
         lastBlock.originalText += " ";
@@ -633,6 +681,137 @@ function mapAnnotationToBlock(annotation, viewport) {
   };
 }
 
+function sampleRenderedBlockColor(left, top, width, height) {
+  const safeLeft = Math.max(0, Math.floor(left));
+  const safeTop = Math.max(0, Math.floor(top));
+  const safeWidth = Math.max(1, Math.ceil(width));
+  const safeHeight = Math.max(1, Math.ceil(height));
+  const padding = 8;
+  const sampleLeft = Math.max(0, safeLeft - padding);
+  const sampleTop = Math.max(0, safeTop - padding);
+  const sampleRight = Math.min(pdfCanvas.width, safeLeft + safeWidth + padding);
+  const sampleBottom = Math.min(pdfCanvas.height, safeTop + safeHeight + padding);
+  const sampleWidth = Math.max(1, sampleRight - sampleLeft);
+  const sampleHeight = Math.max(1, sampleBottom - sampleTop);
+
+  if (sampleWidth <= 0 || sampleHeight <= 0) {
+    return { red: 1, green: 1, blue: 1 };
+  }
+
+  const imageData = canvasContext.getImageData(sampleLeft, sampleTop, sampleWidth, sampleHeight).data;
+  const step = Math.max(1, Math.floor(Math.max(sampleWidth, sampleHeight) / 24));
+  const buckets = new Map();
+
+  for (let y = 0; y < sampleHeight; y += step) {
+    for (let x = 0; x < sampleWidth; x += step) {
+      const insideOriginalBlock = x >= padding
+        && x < sampleWidth - padding
+        && y >= padding
+        && y < sampleHeight - padding;
+      if (insideOriginalBlock) continue;
+
+      const isHorizontalBand = y < Math.max(2, Math.floor(padding / 2))
+        || y >= sampleHeight - Math.max(2, Math.floor(padding / 2));
+      const isVerticalBand = x < Math.max(2, Math.floor(padding / 2))
+        || x >= sampleWidth - Math.max(2, Math.floor(padding / 2));
+      if (!isHorizontalBand && !isVerticalBand) continue;
+
+      const index = ((y * sampleWidth) + x) * 4;
+      const alpha = imageData[index + 3];
+      if (!alpha) continue;
+
+      const pixelRed = imageData[index];
+      const pixelGreen = imageData[index + 1];
+      const pixelBlue = imageData[index + 2];
+      const luminance = (pixelRed * 0.299) + (pixelGreen * 0.587) + (pixelBlue * 0.114);
+
+      if (luminance < 180) continue;
+
+      const bucketKey = [pixelRed, pixelGreen, pixelBlue]
+        .map(channel => Math.round(channel / 16) * 16)
+        .join(":");
+      const bucket = buckets.get(bucketKey) || { red: 0, green: 0, blue: 0, count: 0, luminance: 0 };
+      bucket.red += pixelRed;
+      bucket.green += pixelGreen;
+      bucket.blue += pixelBlue;
+      bucket.count += 1;
+      bucket.luminance += luminance;
+      buckets.set(bucketKey, bucket);
+    }
+  }
+
+  if (!buckets.size) {
+    return { red: 1, green: 1, blue: 1 };
+  }
+
+  const winningBucket = [...buckets.values()].sort((left, right) => {
+    if (right.count !== left.count) return right.count - left.count;
+    return right.luminance - left.luminance;
+  })[0];
+
+  return {
+    red: (winningBucket.red / winningBucket.count) / 255,
+    green: (winningBucket.green / winningBucket.count) / 255,
+    blue: (winningBucket.blue / winningBucket.count) / 255
+  };
+}
+
+function sampleRenderedTextColor(left, top, width, height) {
+  const safeLeft = Math.max(0, Math.floor(left));
+  const safeTop = Math.max(0, Math.floor(top));
+  const safeWidth = Math.max(1, Math.ceil(width));
+  const safeHeight = Math.max(1, Math.ceil(height));
+
+  if (safeWidth <= 0 || safeHeight <= 0) {
+    return { red: 0.06, green: 0.09, blue: 0.16 };
+  }
+
+  const imageData = canvasContext.getImageData(safeLeft, safeTop, safeWidth, safeHeight).data;
+  const step = Math.max(1, Math.floor(Math.max(safeWidth, safeHeight) / 36));
+  const buckets = new Map();
+
+  for (let y = 1; y < safeHeight - 1; y += step) {
+    for (let x = 1; x < safeWidth - 1; x += step) {
+      const index = ((y * safeWidth) + x) * 4;
+      const alpha = imageData[index + 3];
+      if (!alpha) continue;
+
+      const pixelRed = imageData[index];
+      const pixelGreen = imageData[index + 1];
+      const pixelBlue = imageData[index + 2];
+      const luminance = (pixelRed * 0.299) + (pixelGreen * 0.587) + (pixelBlue * 0.114);
+
+      if (luminance > 170) continue;
+
+      const bucketKey = [pixelRed, pixelGreen, pixelBlue]
+        .map(channel => Math.round(channel / 16) * 16)
+        .join(":");
+      const bucket = buckets.get(bucketKey) || { red: 0, green: 0, blue: 0, count: 0, luminance: 0 };
+      bucket.red += pixelRed;
+      bucket.green += pixelGreen;
+      bucket.blue += pixelBlue;
+      bucket.count += 1;
+      bucket.luminance += luminance;
+      buckets.set(bucketKey, bucket);
+    }
+  }
+
+  if (!buckets.size) {
+    return { red: 0.06, green: 0.09, blue: 0.16 };
+  }
+
+  const winningBucket = [...buckets.values()].sort((left, right) => {
+    if (right.count !== left.count) return right.count - left.count;
+    return left.luminance - right.luminance;
+  })[0];
+
+  return {
+    red: (winningBucket.red / winningBucket.count) / 255,
+    green: (winningBucket.green / winningBucket.count) / 255,
+    blue: (winningBucket.blue / winningBucket.count) / 255
+  };
+}
+
 function hydratePdfTextBlock(block, previousBlocks) {
   const signature = createPdfTextBlockSignature(block);
   const previous = previousBlocks.find(candidate => candidate.signature === signature)
@@ -651,6 +830,8 @@ function hydratePdfTextBlock(block, previousBlocks) {
     isItalic: block.isItalic ?? previous?.isItalic ?? false,
     originalText: block.originalText,
     text: previous ? previous.text : block.originalText,
+    backgroundColor: sampleRenderedBlockColor(block.left, block.top, block.width, block.height),
+    textColor: previous?.textColor || sampleRenderedTextColor(block.left, block.top, block.width, block.height),
     xRatio: getRatio(block.left, previewStage.clientWidth),
     yRatio: getRatio(block.top, previewStage.clientHeight),
     widthRatio: getRatio(block.width, previewStage.clientWidth, 0.1),
@@ -682,6 +863,46 @@ function getPdfTextFont(block, fonts, pageWidth, pageHeight) {
   if (inferredFont) return inferredFont;
 
   return fonts.regular;
+}
+
+function getExplicitPdfTextFont(block, fonts) {
+  const styleInfo = getPdfTextStyleInfo(block.fontName || "");
+  const isBold = block.isBold ?? styleInfo.isBold;
+  const isItalic = block.isItalic ?? styleInfo.isItalic;
+
+  if (isBold && isItalic) return fonts.boldItalic;
+  if (isBold) return fonts.bold;
+  if (isItalic) return fonts.italic;
+  return fonts.regular;
+}
+
+function getClosestPdfTextFont(block, fonts, pageWidth, pageHeight) {
+  const styleInfo = getPdfTextStyleInfo(block.fontName || "");
+  const isBold = block.isBold ?? styleInfo.isBold;
+  const isItalic = block.isItalic ?? styleInfo.isItalic;
+
+  if (isBold && isItalic) return fonts.boldItalic;
+  if (isBold) return fonts.bold;
+  if (isItalic) return fonts.italic;
+
+  if (!block.originalText?.trim()) return fonts.regular;
+
+  const originalWidth = (block.originalWidthRatio || block.widthRatio || 0) * pageWidth;
+  const originalFontSize = Math.max(6, (block.fontSizeRatio || 0) * pageHeight);
+  if (!originalWidth || !originalFontSize) return fonts.regular;
+
+  const candidates = [
+    { font: fonts.regular, key: "regular" },
+    { font: fonts.bold, key: "bold" },
+    { font: fonts.italic, key: "italic" },
+    { font: fonts.boldItalic, key: "boldItalic" }
+  ].map(candidate => ({
+    ...candidate,
+    diff: Math.abs(candidate.font.widthOfTextAtSize(block.originalText, originalFontSize) - originalWidth)
+  }));
+
+  candidates.sort((left, right) => left.diff - right.diff);
+  return candidates[0]?.font || fonts.regular;
 }
 
 function inferPdfTextFontFromWidth(block, fonts, pageWidth, pageHeight) {
@@ -917,6 +1138,11 @@ function renderPdfTextOverlays() {
     overlay.rows = 1;
     overlay.wrap = "off";
     overlay.spellcheck = false;
+    overlay.style.background = "transparent";
+    overlay.style.backgroundImage = "none";
+    overlay.style.boxShadow = "none";
+    overlay.style.appearance = "none";
+    overlay.style.webkitAppearance = "none";
     overlay.style.left = `${block.xRatio * previewStage.clientWidth}px`;
     overlay.style.top = `${block.yRatio * previewStage.clientHeight}px`;
     overlay.style.fontSize = `${Math.max(10, block.fontSizeRatio * previewStage.clientHeight)}px`;
@@ -1684,22 +1910,65 @@ function drawEditedPdfText(page, fonts, item) {
   editedBlocks.forEach(block => {
     const xFromLeft = Math.max(0, block.xRatio * width);
     const yFromTop = Math.max(0, block.yRatio * height);
-    const boxWidth = Math.max(24, block.widthRatio * width);
-    const boxHeight = Math.max(14, block.heightRatio * height);
-    const coverWidth = Math.max(24, (block.originalWidthRatio || block.widthRatio) * width);
-    const coverHeight = Math.max(14, (block.originalHeightRatio || block.heightRatio) * height);
     const fontSize = Math.max(6, block.fontSizeRatio * height);
-    const rectPlacement = getRectPlacement(page, xFromLeft, yFromTop, coverWidth, coverHeight);
     const font = getPdfTextFont(block, fonts, width, height);
+    const continuationFont = getExplicitPdfTextFont(block, fonts);
+    const replacementFont = continuationFont;
+    const textColor = { red: 0.06, green: 0.09, blue: 0.16 };
+    const affixOnlyUpdate = getAffixOnlyPdfTextUpdate(block, continuationFont, fontSize, width);
 
-    page.drawRectangle({
-      x: rectPlacement.x,
-      y: rectPlacement.y,
-      width: rectPlacement.width,
-      height: rectPlacement.height,
-      color: rgb(1, 1, 1),
-      rotate: degrees(rectPlacement.rotateAngle)
-    });
+    if (affixOnlyUpdate) {
+      affixOnlyUpdate.lines.forEach(line => {
+        if (!line.text) return;
+
+        const backgroundColor = block.backgroundColor || { red: 1, green: 1, blue: 1 };
+
+        if (line.replaceOriginal && line.originalText) {
+          const originalPlacement = getTextPlacement(page, xFromLeft, yFromTop + line.yOffset, fontSize);
+          page.drawText(line.originalText, {
+            x: originalPlacement.x,
+            y: originalPlacement.y,
+            size: fontSize,
+            font,
+            color: rgb(backgroundColor.red, backgroundColor.green, backgroundColor.blue),
+            rotate: originalPlacement.rotate
+          });
+        }
+
+        const placement = getTextPlacement(page, xFromLeft + line.xOffset, yFromTop + line.yOffset, fontSize);
+        page.drawText(line.text, {
+          x: placement.x,
+          y: placement.y,
+          size: fontSize,
+          font: line.replaceOriginal ? font : continuationFont,
+          color: rgb(textColor.red, textColor.green, textColor.blue),
+          rotate: placement.rotate
+        });
+      });
+      return;
+    }
+
+    const backgroundColor = block.backgroundColor || { red: 1, green: 1, blue: 1 };
+
+    if (block.originalText?.trim()) {
+      const originalLines = splitPlainTextLines(block.originalText);
+      let originalYOffset = 2;
+
+      originalLines.forEach(line => {
+        if (line) {
+          const placement = getTextPlacement(page, xFromLeft + 2, yFromTop + originalYOffset, fontSize);
+          page.drawText(line, {
+            x: placement.x,
+            y: placement.y,
+            size: fontSize,
+            font,
+            color: rgb(backgroundColor.red, backgroundColor.green, backgroundColor.blue),
+            rotate: placement.rotate
+          });
+        }
+        originalYOffset += fontSize * 1.2;
+      });
+    }
 
     if (!block.text.trim()) return;
 
@@ -1712,13 +1981,62 @@ function drawEditedPdfText(page, fonts, item) {
         x: placement.x,
         y: placement.y,
         size: fontSize,
-        font,
-        color: rgb(0.06, 0.09, 0.16),
+        font: replacementFont,
+        color: rgb(textColor.red, textColor.green, textColor.blue),
         rotate: placement.rotate
       });
       yOffset += fontSize * 1.2;
     });
   });
+}
+
+function getAffixOnlyPdfTextUpdate(block, font, fontSize, pageWidth) {
+  const originalLines = splitPlainTextLines(block.originalText);
+  const nextLines = splitPlainTextLines(block.text);
+  const lineGap = fontSize * 1.2;
+  const lines = [];
+  const detectedOriginalWidth = Math.max(0, (block.originalWidthRatio || block.widthRatio || 0) * pageWidth);
+
+  for (let index = 0; index < nextLines.length; index += 1) {
+    const originalLine = originalLines[index] || "";
+    const nextLine = nextLines[index] || "";
+
+    const matchIndex = originalLine ? nextLine.indexOf(originalLine) : 0;
+    if (index < originalLines.length && matchIndex < 0) {
+      return null;
+    }
+
+    const prefixText = originalLine ? nextLine.slice(0, matchIndex) : nextLine;
+    const suffixText = originalLine ? nextLine.slice(matchIndex + originalLine.length) : "";
+    const prefixWidth = prefixText ? font.widthOfTextAtSize(prefixText, fontSize) : 0;
+    const originalWidth = originalLine ? font.widthOfTextAtSize(originalLine, fontSize) : 0;
+
+    if (prefixText) {
+      lines.push({
+        text: nextLine,
+        originalText: originalLine,
+        xOffset: -prefixWidth,
+        yOffset: index * lineGap,
+        replaceOriginal: true,
+        originalWidth: Math.max(originalWidth, detectedOriginalWidth),
+        originalHeight: Math.max(fontSize * 1.2, fontSize)
+      });
+      continue;
+    }
+
+    if (suffixText) {
+      lines.push({
+        text: suffixText,
+        xOffset: matchIndex === 0 ? Math.max(originalWidth, detectedOriginalWidth) : prefixWidth + originalWidth,
+        yOffset: index * lineGap,
+        replaceOriginal: false,
+        originalWidth: Math.max(originalWidth, detectedOriginalWidth),
+        originalHeight: Math.max(fontSize * 1.2, fontSize)
+      });
+    }
+  }
+
+  return lines.length ? { lines } : null;
 }
 
 function splitPlainTextLines(text) {
